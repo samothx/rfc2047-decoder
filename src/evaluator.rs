@@ -15,8 +15,7 @@ pub enum Error {
 }
 
 fn decode_utf8(encoded_bytes: &Vec<u8>) -> Result<&str> {
-    let decoded_bytes = std::str::from_utf8(&encoded_bytes)?;
-    Ok(decoded_bytes)
+    Ok(std::str::from_utf8(&encoded_bytes)?)
 }
 
 fn decode_base64(encoded_bytes: &Vec<u8>) -> Result<Vec<u8>> {
@@ -73,8 +72,14 @@ pub fn run(ast: &Ast) -> Result<String> {
                 output.push_str(&decoded_str);
             }
             ClearBytes(clear_bytes) => {
-                let clear_str = decode_utf8(&clear_bytes)?;
-                output.push_str(clear_str);
+                match decode_utf8(&clear_bytes) {
+                    Ok(clear_str) => {
+                        output.push_str(clear_str);
+                    },
+                    Err(_e) => {
+                        output.push_str(&*String::from_utf8_lossy(&clear_bytes))
+                    }
+                }
             }
         }
     }
