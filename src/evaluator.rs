@@ -1,6 +1,7 @@
 use charset::{self, Charset};
 
 use crate::parser::{Ast, Node::*};
+use log::warn;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -67,8 +68,21 @@ pub fn run(ast: &Ast) -> Result<String> {
     for node in ast {
         match node {
             EncodedBytes(node) => {
-                let decoded_bytes = decode_with_encoding(node.encoding, &node.bytes)?;
-                let decoded_str = decode_with_charset(&node.charset, &decoded_bytes)?;
+                let decoded_str = match decode_with_encoding(node.encoding, &node.bytes) {
+                    Ok(decoded_bytes) => {
+                        match decode_with_charset(&node.charset, &decoded_bytes) {
+                            Ok(decodecd_str) => decodecd_str,
+                            Err(e) => {
+                                warn!("failed to decode bytes to charset {:?} : {:?}", &node.charset, e);
+                                String::from_utf8_lossy(&node.bytes).to_string()
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        warn!("failed to decode bytes from {}: {:?}", node.encoding, e);
+                        String::from_utf8_lossy(&node.bytes).to_string()
+                    }
+                };
                 output.push_str(&decoded_str);
             }
             ClearBytes(clear_bytes) => {
@@ -76,7 +90,8 @@ pub fn run(ast: &Ast) -> Result<String> {
                     Ok(clear_str) => {
                         output.push_str(clear_str);
                     },
-                    Err(_e) => {
+                    Err(e) => {
+                        warn!("failed to decode clear bytes to utf-8: {:?}", e);
                         output.push_str(&*String::from_utf8_lossy(&clear_bytes))
                     }
                 }
